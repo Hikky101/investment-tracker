@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#E03040">
+<meta name="description" content="42日間の投資学習デイリータスク管理">
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%23E03040'/><text x='50' y='68' text-anchor='middle' font-size='50' fill='white' font-family='sans-serif' font-weight='bold'>投</text></svg>">
+<title>投資学習トラッカー</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{--bg:#fff;--bg2:#f5f5f7;--bg3:#ebebef;--tx:#1a1a2e;--tx2:#6b6b80;--tx3:#a0a0b4;--bd:rgba(0,0,0,.08);--radius:14px}
+@media(prefers-color-scheme:dark){:root{--bg:#0d0d12;--bg2:#1a1a24;--bg3:#26263a;--tx:#e8e8f0;--tx2:#9090a8;--tx3:#5c5c74;--bd:rgba(255,255,255,.08)}}
+html{font-family:'Hiragino Kaku Gothic ProN','Noto Sans JP','SF Pro Text',system-ui,sans-serif;background:var(--bg);color:var(--tx);line-height:1.6;-webkit-font-smoothing:antialiased}
+body{max-width:480px;margin:0 auto;padding:0 0 120px;min-height:100dvh}
+button{font-family:inherit;cursor:pointer}
+
+/* Animations */
+@keyframes pop-in{0%{transform:scale(.85);opacity:0}100%{transform:scale(1);opacity:1}}
+@keyframes check-burst{0%{transform:scale(.5);opacity:0}50%{transform:scale(1.3)}100%{transform:scale(1);opacity:1}}
+@keyframes confetti{0%{opacity:1;transform:translate(-50%,-50%) scale(1) rotate(0)}100%{opacity:0;transform:translate(calc(-50% + var(--cx)),calc(-50% + var(--cy))) scale(.4) rotate(var(--cr))}}
+@keyframes day-done{0%{transform:scale(1)}30%{transform:scale(1.015)}100%{transform:scale(1)}}
+@keyframes slide-open{from{opacity:0;max-height:0;padding-top:0;padding-bottom:0}to{opacity:1;max-height:900px}}
+@keyframes ring-pulse{0%{box-shadow:0 0 0 0 var(--ring)}70%{box-shadow:0 0 0 7px transparent}100%{box-shadow:0 0 0 0 transparent}}
+@keyframes progress-fill{from{width:0}to{width:var(--w)}}
+
+/* Tab bar */
+.tabs{display:flex;gap:6px;overflow-x:auto;padding:0 16px 14px;scrollbar-width:none;-ms-overflow-style:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{flex-shrink:0;border:none;border-radius:10px;padding:8px 14px;font-size:12px;font-weight:600;min-width:56px;text-align:center;transition:all .2s}
+.tab:active{transform:scale(.93)}
+.tab.active{color:#fff;box-shadow:0 2px 12px var(--shadow)}
+
+/* Day cards */
+.day-card{margin:0 12px 8px;border-radius:var(--radius);border:1px solid var(--bd);overflow:hidden;transition:all .35s;position:relative}
+.day-card.today{border:2px solid var(--accent)}
+.day-card.done{border-color:transparent}
+.day-head{padding:14px 14px;display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none}
+.day-num{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0;transition:all .35s}
+.day-title{font-size:14px;font-weight:600;line-height:1.35;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.day-sub{font-size:11px;color:var(--tx3);margin-top:1px}
+.day-badge{font-size:9px;padding:3px 9px;border-radius:10px;font-weight:700;color:#fff;flex-shrink:0;letter-spacing:.5px}
+.day-chevron{flex-shrink:0;transition:transform .3s;color:var(--tx3)}
+.day-card.open .day-chevron{transform:rotate(180deg)}
+.task-list{padding:0 10px 14px;animation:slide-open .3s ease}
+.task-row{display:flex;align-items:flex-start;gap:12px;padding:11px 8px;cursor:pointer;user-select:none;border-radius:10px;transition:background .15s}
+.task-row:active{background:var(--bg2)}
+.checkbox{width:24px;height:24px;border-radius:8px;flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;border:2px solid var(--bd);transition:all .25s}
+.checkbox.checked{border:none}
+.checkbox.checked svg{animation:check-burst .25s ease}
+.task-text{font-size:13.5px;line-height:1.65;transition:all .3s}
+.task-text.done{color:var(--tx3);text-decoration:line-through}
+.next-btn{width:100%;margin-top:8px;padding:13px;border-radius:12px;border:1.5px dashed;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:6px;background:transparent;transition:all .2s}
+.next-btn:active{transform:scale(.98)}
+
+/* Menu */
+.menu-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:100;opacity:0;transition:opacity .3s;pointer-events:none}
+.menu-overlay.open{opacity:1;pointer-events:auto}
+.menu-sheet{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;background:var(--bg);border-radius:20px 20px 0 0;padding:20px 20px 40px;z-index:101;translate:0 100%;transition:translate .35s ease;box-shadow:0 -4px 30px rgba(0,0,0,.15)}
+.menu-sheet.open{translate:0 0}
+.menu-handle{width:36px;height:4px;border-radius:2px;background:var(--bg3);margin:0 auto 20px}
+.menu-item{display:flex;align-items:center;gap:14px;padding:15px 8px;border-bottom:1px solid var(--bd);font-size:14px;cursor:pointer;user-select:none;color:var(--tx)}
+.menu-item:last-child{border-bottom:none}
+.menu-item:active{opacity:.6}
+.menu-icon{width:32px;height:32px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
+
+/* Confetti */
+.confetti-wrap{position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:5}
+.confetti-dot{position:absolute;border-radius:50%;opacity:0;animation:confetti .65s ease-out forwards}
+
+/* Install banner */
+.install-bar{margin:12px 12px 0;padding:14px 16px;border-radius:var(--radius);display:flex;align-items:center;gap:12px;font-size:13px;cursor:pointer;border:1px solid var(--bd);background:var(--bg2)}
+.install-bar:active{opacity:.7}
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+<script type="text/babel" data-type="module">
+/* ═══════════════════════════════════════════════════
+   DATABASE MODULE — IndexedDB wrapper
+   ═══════════════════════════════════════════════════ */
+const DB_NAME = 'InvestTracker';
+const DB_VERSION = 1;
+const STORE = 'appState';
+
+const Database = {
+  _db: null,
+
+  async open() {
+    if (this._db) return this._db;
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open(DB_NAME, DB_VERSION);
+      req.onupgradeneeded = (e) => {
+        const db = e.target.result;
+        if (!db.objectStoreNames.contains(STORE)) {
+          db.createObjectStore(STORE, { keyPath: 'id' });
+        }
+      };
+      req.onsuccess = (e) => { this._db = e.target.result; resolve(this._db); };
+      req.onerror = () => reject(req.error);
+    });
+  },
+
+  async get(id) {
+    const db = await this.open();
+    return new Promise((resolve) => {
+      const tx = db.transaction(STORE, 'readonly');
+      const req = tx.objectStore(STORE).get(id);
+      req.onsuccess = () => resolve(req.result?.data ?? null);
+      req.onerror = () => resolve(null);
+    });
+  },
+
+  async set(id, data) {
+    const db = await this.open();
+    return new Promise((resolve) => {
+      const tx = db.transaction(STORE, 'readwrite');
+      tx.objectStore(STORE).put({ id, data, updatedAt: Date.now() });
+      tx.oncomplete = () => resolve(true);
+      tx.onerror = () => resolve(false);
+    });
+  },
+
+  async exportAll() {
+    const db = await this.open();
+    return new Promise((resolve) => {
+      const tx = db.transaction(STORE, 'readonly');
+      const req = tx.objectStore(STORE).getAll();
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => resolve([]);
+    });
+  },
+
+  async importAll(records) {
+    const db = await this.open();
+    return new Promise((resolve) => {
+      const tx = db.transaction(STORE, 'readwrite');
+      const store = tx.objectStore(STORE);
+      records.forEach(r => store.put(r));
+      tx.oncomplete = () => resolve(true);
+      tx.onerror = () => resolve(false);
+    });
+  },
+};
+
+/* ═══════════════════════════════════════════════════
+   SCHEDULE DATA — 編集しやすいように分離
+   ═══════════════════════════════════════════════════ */
+const SCHEDULE = [
+  { week:1, title:"損切りの鉄則を叩き込む", sub:"全ての土台。ここが甘いと全部崩れる", accent:"#E03040", bg:"#FEF2F2", dbg:"#2a1418",
+    days:[
+      {day:1,title:"教材を手に入れる",tasks:["オニール著『オニールの成長株発掘法』を入手する（電子書籍OK）","第1章〜第3章を通読する。完璧に理解しなくてOK、まず全体像を掴む","読みながら気になった箇所にマーカーを引く or メモを取る"]},
+      {day:2,title:"損切りの章を集中読破",tasks:["オニール本の損切りに関する章を2回読む（理解が浅いなら3回）","「なぜ-7〜8%なのか」の根拠をノートに自分の言葉で書き出す","損切りしなかった場合のシミュレーション計算する"]},
+      {day:3,title:"失敗事例から学ぶ",tasks:["「損切りできなかった 体験談」で検索し5つの失敗事例を読む","各事例の共通パターンをノートにまとめる","自分のルールブックの絶対ルール（Section 01）を音読する"]},
+      {day:4,title:"証券口座の準備",tasks:["SBI証券の口座を開設する（開設済みなら次へ）","HYPER SBI 2をインストールして基本操作を確認","注文方法（成行・指値・逆指値）の違いを調べてノートにまとめる"]},
+      {day:5,title:"過去チャートで損切り練習",tasks:["過去に暴落した銘柄のチャートを5つ探す","各チャートで「ここが-7〜8%ライン」を特定する","損切りが遅れた場合の損失額を30万円投資で計算する"]},
+      {day:6,title:"損切りルールを自分のものに",tasks:["損切りルールを自分の言葉で書き直す","「なぜ損切りを守るのか」理由を3つ論理で書く","逆指値注文の設定方法をSBI証券で確認する（注文はしない）"]},
+      {day:7,title:"Week 1 振り返り",tasks:["今週学んだことを1ページにまとめる","「損切りとは何か」を未経験者に説明するつもりで書く","来週の予定を確認しチャート学習の時間を確保する"]},
+  ]},
+  { week:2, title:"チャートの読み方を身につける", sub:"目で見て判断できるようになる", accent:"#2563EB", bg:"#EFF6FF", dbg:"#141c2a",
+    days:[
+      {day:8,title:"ローソク足の基礎",tasks:["ローソク足の読み方：陽線・陰線・上ヒゲ・下ヒゲの意味を学ぶ","SBI証券で実際の銘柄を5つ開きローソク足を観察する","大陽線・大陰線・十字線が出た時に何が起きているか調べる"]},
+      {day:9,title:"移動平均線を理解する",tasks:["移動平均線（25日・50日・200日）の意味と計算方法を学ぶ","ゴールデンクロスとデッドクロスの意味を図解する","実際のチャートで移動平均線を表示し株価との関係を観察（5銘柄）"]},
+      {day:10,title:"出来高の見方をマスター",tasks:["出来高とは何か、なぜ重要なのかをノートにまとめる","「出来高を伴った上昇」と「なき上昇」の違いを過去チャートで確認","出来高2倍以上急増した日を5例探しその後を追跡"]},
+      {day:11,title:"カップウィズハンドルを学ぶ",tasks:["オニール本のカップウィズハンドルの章を精読する","カップの形成条件（期間・深さ・ハンドル）をノートに整理","過去の大化け銘柄で実例を5つ探す"]},
+      {day:12,title:"パターン認識の練習",tasks:["現在の市場でカップウィズハンドルに見える銘柄を3つ探す","各チャートをスクショしてピボットポイントに印をつける","「ここで買うべき」「まだ早い」を判断してメモ"]},
+      {day:13,title:"ブレイクアウトの成功と失敗",tasks:["ブレイクアウトの定義と条件をノートにまとめる","成功3例と失敗3例を分析する","成功と失敗を分けた要因を比較表にする"]},
+      {day:14,title:"Week 2 振り返り",tasks:["今週学んだチャート用語を一覧にし各用語を一文で説明する","ランダムなチャートを3つ開いて分析してみる","「チャートの何を見ればいいか」を5項目でまとめる"]},
+  ]},
+  { week:3, title:"スクリーニング＋CAN-SLIM", sub:"銘柄を選ぶ目を養う", accent:"#0D9488", bg:"#F0FDFA", dbg:"#0f201e",
+    days:[
+      {day:15,title:"スクリーニングツールを使う",tasks:["SBI証券のスクリーニング機能の条件項目を一通り確認","「年初来高値更新」でスクリーニングをかけて結果を保存","株探（kabutan.jp）の新高値銘柄ページをブックマークする"]},
+      {day:16,title:"毎日の習慣をスタート",tasks:["朝：日経平均・TOPIXの前日終値と先物をチェック","夜：新高値更新銘柄リストから気になる銘柄を3つピックアップ","3銘柄のチャートを見てブレイクアウトかどうか判断する"]},
+      {day:17,title:"CAN-SLIMの「C」を実践",tasks:["「C」＝直近四半期EPS成長率の調べ方を学ぶ","決算短信・決算説明資料の読み方を覚える","昨日の3銘柄の直近四半期EPSを調べて+25%以上か確認"]},
+      {day:18,title:"CAN-SLIMの「A」を実践",tasks:["「A」＝年間EPS成長の調べ方を学ぶ","株探 or IR BANKで過去3年のEPS推移の確認方法を覚える","新高値銘柄5つの年間EPS3年連続成長を全て調べる"]},
+      {day:19,title:"CAN-SLIMの「N」を実践",tasks:["「N」＝新製品・新経営陣・新高値の確認方法を整理","適時開示の読み方を学ぶ（TDnet or 株探）","注目銘柄のIR資料を1社分じっくり読む"]},
+      {day:20,title:"「S」と「M」を実践",tasks:["「S」＝ブレイク時出来高の確認方法を整理","「M」＝市場全体の方向性の判断方法を学ぶ","今の日経平均のトレンドを根拠付きで判断してノートに書く"]},
+      {day:21,title:"Week 3 振り返り",tasks:["CAN-SLIM全項目を1枚のチェックシートにまとめる","今週最も有望だった1銘柄を選び理由を書く","毎日の日課が習慣になっているか自己チェック"]},
+  ]},
+  { week:4, title:"エアトレード実践①", sub:"お金を使わず本番と同じ判断をする", accent:"#D97706", bg:"#FFFBEB", dbg:"#201a0f",
+    days:[
+      {day:22,title:"候補銘柄を選定",tasks:["朝の日課：日経平均・TOPIX確認","スクリーニングで新高値銘柄から候補を3つ選ぶ","各候補の基本情報をトレード記録ノートに書く"]},
+      {day:23,title:"候補①を徹底分析",tasks:["候補①のCAN-SLIMチェックリストを全項目通す","候補①のIR資料を読んで成長ストーリーを理解する","「なぜ今この株が買われているか」を3行以上書く"]},
+      {day:24,title:"候補②③を分析・比較",tasks:["候補②③のCAN-SLIMチェックを全項目通す","3銘柄を比較し最も条件に合う1銘柄を選ぶ。理由を記録","選ばなかった銘柄の「なぜ選ばなかったか」も記録"]},
+      {day:25,title:"エアトレード①：買い",tasks:["選んだ1銘柄でエアトレードの「買い」を記録","記録：銘柄名/買値/株数/投入額/買った理由/損切りライン","損切りライン到達時の損失額を計算して記録"]},
+      {day:26,title:"追跡 Day 1",tasks:["朝の日課＋保有銘柄の始値を確認","終値・出来高・前日比を記録する","損切りラインとの距離（%）を計算する"]},
+      {day:27,title:"追跡 Day 2",tasks:["終値・出来高・前日比を記録する","買った時のシナリオに変化がないか確認","日経平均のトレンドに変化がないか確認"]},
+      {day:28,title:"Week 4 振り返り",tasks:["エアトレード①の途中経過を分析","CAN-SLIMチェックの精度は十分だったか振り返る","トレード記録の書き方に改善点があれば修正"]},
+  ]},
+  { week:5, title:"エアトレード実践②", sub:"判断の精度を上げる。売りの練習も", accent:"#7C3AED", bg:"#F5F3FF", dbg:"#1a152a",
+    days:[
+      {day:29,title:"①の決着＋新規候補選定",tasks:["エアトレード①を利確 or 損切り判断する","売却理由を記録：損切り/+20%到達/シナリオ崩壊のどれか","新しいスクリーニングで次の候補を3つ選ぶ"]},
+      {day:30,title:"候補分析＋IR精読",tasks:["候補3銘柄全てのCAN-SLIMチェックを通す","最有望銘柄のIR資料を精読（競合比較・市場規模まで）","「成長ストーリーが崩れる条件」を書く"]},
+      {day:31,title:"エアトレード②：買い",tasks:["2回目のエアトレードの「買い」を記録","前回の反省を活かせているか確認","出来高がブレイク基準（通常の2倍以上）を満たしているか確認"]},
+      {day:32,title:"複数銘柄の追跡練習",tasks:["エアトレード②の追跡記録をつける","過去チェックした銘柄のその後を追跡","「買わなくて正解」「買うべきだった」を分析して記録"]},
+      {day:33,title:"利確ルールのシミュレーション",tasks:["ルールブックSection 06の利確ルールを復習する","+20%到達時の半分売り→残りトレイリングをシミュレーション","「全部売った場合」vs「半分残した場合」の利益差を計算"]},
+      {day:34,title:"エアトレード全体集計",tasks:["エアトレード①②の結果を集計：勝率・平均利益・平均損失","損益比率（平均利益÷平均損失）を計算。1.5以上が目標","ルールを守れたかを正直に自己評価する"]},
+      {day:35,title:"Week 5 振り返り＋実弾準備",tasks:["エアトレードで得た教訓トップ3を書き出す","口座に30万円入金できるか確認","ルールブックを通読し署名欄にサインする"]},
+  ]},
+  { week:6, title:"実弾トレード開始", sub:"ルールを守ることだけに集中", accent:"#16A34A", bg:"#F0FDF4", dbg:"#0f1f14",
+    days:[
+      {day:36,title:"口座入金＋最終確認",tasks:["証券口座に30万円を入金する","絶対ルール（Section 01）を声に出して読む","「最初のトレードの目的はルール遵守」と3回書く"]},
+      {day:37,title:"銘柄選定",tasks:["スクリーニングで候補銘柄を3つ選定","CAN-SLIMチェックリストを全項目通す","3,000円以下で100株買える銘柄であることを確認"]},
+      {day:38,title:"最終分析",tasks:["最有望銘柄のIR資料を最終確認","買う理由を3行以上で記録する","損切りラインを具体的な株価で計算し逆指値の準備をする"]},
+      {day:39,title:"エントリー判断",tasks:["ブレイク条件（出来高2倍以上・ピボット+5%以内）を確認","条件が揃えば買い注文。揃っていなければ絶対に買わない","買ったら即座に逆指値（損切り注文）を設定する"]},
+      {day:40,title:"保有銘柄の監視",tasks:["株価と出来高を確認。損切りラインとの距離を計算","買った時のシナリオに変化がないか確認","感情チェック：焦り・恐怖・欲が出ていないかノートに書く"]},
+      {day:41,title:"トレード記録の完成",tasks:["保有継続 or 売却の判断をルールに基づいて行う","トレード記録を全項目完全に記入する","「ルールを守れたか」をYES/NOで記録する"]},
+      {day:42,title:"Phase 0 完了",tasks:["6週間で学んだことの総まとめを書く","守るべきルール上位5つを優先順位付きで書き出す","「ルールを守って売買する感覚を掴む」は達成できたか自己評価"]},
+  ]},
+];
+
+/* ═══════════════════════════════════════════════════
+   COMPONENTS
+   ═══════════════════════════════════════════════════ */
+const { useState, useEffect, useCallback, useRef } = React;
+
+function Confetti({ color }) {
+  const dots = React.useMemo(() => Array.from({length:14},(_,i)=>{
+    const a = (Math.random()-.5)*140, d = 25+Math.random()*50;
+    return { i, x:30+Math.random()*40, cx:Math.sin(a*Math.PI/180)*d, cy:-Math.cos(a*Math.PI/180)*d, s:3+Math.random()*5, dl:Math.random()*.12, r:Math.random()*360 };
+  }),[]);
+  return <div className="confetti-wrap">{dots.map(p=>
+    <div key={p.i} className="confetti-dot" style={{left:`${p.x}%`,top:'50%',width:p.s,height:p.s,background:color,animationDelay:`${p.dl}s`,['--cx']:`${p.cx}px`,['--cy']:`${p.cy}px`,['--cr']:`${p.r}deg`,borderRadius:p.s>5?'50%':'1px'}}/>
+  )}</div>;
+}
+
+function CheckIcon() {
+  return <svg width="14" height="14" viewBox="0 0 14 14"><path d="M3 7l3 3 5-6" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/></svg>;
+}
+function ChevronDown() {
+  return <svg width="20" height="20" viewBox="0 0 20 20" className="day-chevron"><path d="M5 8l5 5 5-5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>;
+}
+
+/* ═══════════════════════════════════════════════════
+   MAIN APP
+   ═══════════════════════════════════════════════════ */
+function App() {
+  const [state, setState] = useState({ checked:{}, startDate:null, activeWeek:0, focusDay:null });
+  const [ready, setReady] = useState(false);
+  const [burst, setBurst] = useState(null);
+  const [menu, setMenu] = useState(false);
+  const refs = useRef({});
+
+  // Load from IndexedDB
+  useEffect(()=>{
+    Database.get('state').then(d=>{ if(d) setState(d); setReady(true); });
+  },[]);
+
+  // Save to IndexedDB
+  const save = useCallback((s)=> Database.set('state',s), []);
+
+  const up = (fn)=> setState(prev=>{ const next = fn(prev); save(next); return next; });
+
+  const toggle = (wi,di,ti)=>{
+    const k = `${wi}-${di}-${ti}`;
+    up(prev=>{
+      const next = {...prev, checked:{...prev.checked,[k]:!prev.checked[k]}};
+      const allDone = SCHEDULE[wi].days[di].tasks.every((_,j)=> j===ti ? !prev.checked[k] : prev.checked[`${wi}-${di}-${j}`]);
+      if(allDone){ setBurst(`${wi}-${di}`); setTimeout(()=>setBurst(null),1200); }
+      return next;
+    });
+  };
+
+  const openDay = (wi,di)=>{
+    const k = `${wi}-${di}`;
+    up(p=>({...p, focusDay: p.focusDay===k?null:k, activeWeek:wi}));
+    setTimeout(()=>refs.current[k]?.scrollIntoView({behavior:'smooth',block:'start'}),100);
+  };
+
+  const isDayDone = (wi,di)=> SCHEDULE[wi].days[di].tasks.every((_,ti)=>state.checked[`${wi}-${di}-${ti}`]);
+  const weekProg = (wi)=>{ let t=0,d=0; SCHEDULE[wi].days.forEach((day,di)=>day.tasks.forEach((_,ti)=>{t++;if(state.checked[`${wi}-${di}-${ti}`])d++;})); return{t,d,pct:t?Math.round(d/t*100):0}; };
+  const totalProg = ()=>{ let t=0,d=0; SCHEDULE.forEach((w,wi)=>w.days.forEach((day,di)=>day.tasks.forEach((_,ti)=>{t++;if(state.checked[`${wi}-${di}-${ti}`])d++;})));return{t,d,pct:t?Math.round(d/t*100):0};};
+  const curDay = state.startDate ? Math.floor((new Date()-new Date(state.startDate))/864e5)+1 : 0;
+  const isDark = window.matchMedia?.('(prefers-color-scheme:dark)').matches;
+
+  // Export data
+  const exportData = async ()=>{
+    const all = await Database.exportAll();
+    const blob = new Blob([JSON.stringify(all,null,2)],{type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href=url; a.download=`inv-tracker-backup-${new Date().toISOString().slice(0,10)}.json`; a.click();
+    URL.revokeObjectURL(url);
+    setMenu(false);
+  };
+
+  // Import data
+  const importData = ()=>{
+    const input = document.createElement('input'); input.type='file'; input.accept='.json';
+    input.onchange = async (e)=>{
+      const file = e.target.files[0]; if(!file) return;
+      const text = await file.text();
+      const records = JSON.parse(text);
+      await Database.importAll(records);
+      const d = await Database.get('state');
+      if(d) setState(d);
+      setMenu(false);
+      alert('データを復元しました');
+    };
+    input.click();
+  };
+
+  const resetAll = ()=>{
+    if(confirm('全ての進捗をリセットしますか？この操作は元に戻せません。')){
+      const fresh = {checked:{},startDate:null,activeWeek:0,focusDay:null};
+      setState(fresh); save(fresh); setMenu(false);
+    }
+  };
+
+  if(!ready) return <div style={{display:'flex',justifyContent:'center',alignItems:'center',height:'100dvh'}}><p style={{color:'var(--tx3)',fontSize:14}}>読み込み中...</p></div>;
+
+  const tp = totalProg();
+  const aw = state.activeWeek;
+  const week = SCHEDULE[aw];
+  const wp = weekProg(aw);
+
+  return <>
+    {/* Header */}
+    <div style={{padding:'40px 20px 16px',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+      <div>
+        <div style={{fontSize:10,letterSpacing:5,textTransform:'uppercase',color:'var(--tx3)',marginBottom:6}}>Phase 0 — 42 days</div>
+        <h1 style={{fontSize:20,fontWeight:800,letterSpacing:-.5}}>投資学習トラッカー</h1>
+      </div>
+      <button onClick={()=>setMenu(true)} style={{width:40,height:40,borderRadius:12,border:'1px solid var(--bd)',background:'var(--bg2)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:18}}>
+        ☰
+      </button>
+    </div>
+
+    {/* Start */}
+    {!state.startDate ? (
+      <div style={{padding:'24px 20px 32px',textAlign:'center'}}>
+        <p style={{fontSize:14,color:'var(--tx2)',marginBottom:20,lineHeight:1.7}}>毎日3つのタスクをこなすだけ。<br/>他は見ない。これだけに集中する。</p>
+        <button onClick={()=>up(p=>({...p,startDate:new Date().toISOString().slice(0,10)}))} style={{background:'#E03040',color:'#fff',border:'none',borderRadius:14,padding:'16px 0',fontSize:16,fontWeight:700,width:'100%',maxWidth:320,boxShadow:'0 4px 24px rgba(224,48,64,.3)'}}>
+          今日から開始する
+        </button>
+        <p style={{fontSize:11,color:'var(--tx3)',marginTop:12}}>タップすると今日が Day 1 になります</p>
+      </div>
+    ) : (
+      <div style={{padding:'0 20px 12px'}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',marginBottom:8}}>
+          <span style={{fontSize:28,fontWeight:800,letterSpacing:-1}}>Day {Math.min(curDay,42)}</span>
+          <span style={{fontSize:13,color:'var(--tx2)'}}>{tp.d}/{tp.t}</span>
+        </div>
+        <div style={{background:'var(--bg2)',borderRadius:6,height:8,overflow:'hidden'}}>
+          <div style={{width:`${tp.pct}%`,height:'100%',background:week.accent,borderRadius:6,transition:'width .5s ease',animation:'progress-fill .8s ease',['--w']:`${tp.pct}%`}}/>
+        </div>
+        <div style={{fontSize:11,color:'var(--tx3)',marginTop:4,textAlign:'right'}}>{tp.pct}%</div>
+      </div>
+    )}
+
+    {/* Week tabs */}
+    <div className="tabs">
+      {SCHEDULE.map((w,i)=>{
+        const p = weekProg(i);
+        return <button key={i} className={`tab ${i===aw?'active':''}`}
+          onClick={()=>up(prev=>({...prev,activeWeek:i,focusDay:null}))}
+          style={{
+            background: i===aw ? w.accent : 'var(--bg2)',
+            color: i===aw ? '#fff' : 'var(--tx2)',
+            ['--shadow']: `${w.accent}40`,
+          }}>
+          <div>W{w.week}</div>
+          {p.d>0 && <div style={{fontSize:10,marginTop:1,opacity:.85}}>{p.pct===100?'✓':`${p.pct}%`}</div>}
+        </button>;
+      })}
+    </div>
+
+    {/* Week header */}
+    <div style={{padding:'4px 20px 12px'}}>
+      <div style={{display:'flex',alignItems:'center',gap:10}}>
+        <div style={{width:4,height:30,borderRadius:2,background:week.accent}}/>
+        <div>
+          <h2 style={{fontSize:16,fontWeight:800,color:week.accent,margin:0}}>{week.title}</h2>
+          <p style={{fontSize:12,color:'var(--tx2)',margin:0,marginTop:2}}>{week.sub}</p>
+        </div>
+      </div>
+      <div style={{display:'flex',gap:3,marginTop:10,marginLeft:14}}>
+        {week.days.map((_,di)=>{
+          const done = isDayDone(aw,di);
+          const partial = week.days[di].tasks.some((__,ti)=>state.checked[`${aw}-${di}-${ti}`]);
+          return <div key={di} style={{flex:1,height:4,borderRadius:2,transition:'background .4s',background:done?week.accent:partial?`${week.accent}50`:'var(--bg3)'}}/>;
+        })}
+      </div>
+    </div>
+
+    {/* Day cards */}
+    <div style={{padding:'4px 0'}}>
+      {week.days.map((day,di)=>{
+        const complete = isDayDone(aw,di);
+        const isToday = state.startDate && day.day===curDay;
+        const fk = `${aw}-${di}`;
+        const isOpen = state.focusDay===fk;
+        const isBurst = burst===fk;
+        const checked_n = day.tasks.filter((_,ti)=>state.checked[`${aw}-${di}-${ti}`]).length;
+
+        return <div key={di} ref={el=>{refs.current[fk]=el;}}
+          className={`day-card ${isToday?'today':''} ${complete?'done':''} ${isOpen?'open':''}`}
+          style={{
+            ['--accent']:week.accent,
+            background: complete ? (isDark ? week.dbg : week.bg) : 'var(--bg)',
+            animation: isBurst ? 'day-done .4s ease':'none',
+          }}>
+          {isBurst && <Confetti color={week.accent}/>}
+
+          <div className="day-head" onClick={()=>openDay(aw,di)}>
+            <div className="day-num" style={{
+              background: complete ? week.accent : isToday ? `${week.accent}18` : 'var(--bg2)',
+              color: complete ? '#fff' : isToday ? week.accent : 'var(--tx2)',
+              ['--ring']: `${week.accent}44`,
+              animation: isToday&&!complete ? 'ring-pulse 2s ease infinite':'none',
+            }}>
+              {complete ? <span style={{animation:'check-burst .3s ease'}}>✓</span> : day.day}
+            </div>
+
+            <div style={{flex:1,minWidth:0}}>
+              <div className="day-title" style={{color:complete?week.accent:'var(--tx)'}}>{day.title}</div>
+              {!isOpen && !complete && checked_n>0 && <div className="day-sub">{checked_n}/{day.tasks.length} 完了</div>}
+            </div>
+
+            {isToday && !complete && <span className="day-badge" style={{background:week.accent}}>TODAY</span>}
+            <ChevronDown/>
+          </div>
+
+          {isOpen && <div className="task-list">
+            {day.tasks.map((task,ti)=>{
+              const k = `${aw}-${di}-${ti}`;
+              const done = state.checked[k];
+              return <div key={ti} className="task-row" onClick={()=>toggle(aw,di,ti)}>
+                <div className={`checkbox ${done?'checked':''}`} style={{background:done?week.accent:'transparent'}}>
+                  {done && <CheckIcon/>}
+                </div>
+                <span className={`task-text ${done?'done':''}`}>{task}</span>
+              </div>;
+            })}
+
+            {complete && di < week.days.length-1 && (
+              <button className="next-btn" onClick={e=>{e.stopPropagation();openDay(aw,di+1);}}
+                style={{color:week.accent,borderColor:`${week.accent}40`}}>
+                次へ → Day {week.days[di+1].day}：{week.days[di+1].title}
+              </button>
+            )}
+            {complete && di===week.days.length-1 && aw < SCHEDULE.length-1 && (
+              <button className="next-btn" onClick={e=>{e.stopPropagation();up(p=>({...p,activeWeek:aw+1,focusDay:`${aw+1}-0`}));}}
+                style={{color:SCHEDULE[aw+1].accent,borderColor:`${SCHEDULE[aw+1].accent}40`}}>
+                Week {aw+2} へ → {SCHEDULE[aw+1].title}
+              </button>
+            )}
+          </div>}
+        </div>;
+      })}
+    </div>
+
+    {/* Menu sheet */}
+    <div className={`menu-overlay ${menu?'open':''}`} onClick={()=>setMenu(false)}/>
+    <div className={`menu-sheet ${menu?'open':''}`}>
+      <div className="menu-handle"/>
+      <div className="menu-item" onClick={exportData}>
+        <div className="menu-icon" style={{background:'var(--bg2)'}}>💾</div>
+        <div><div style={{fontWeight:600}}>データをバックアップ</div><div style={{fontSize:12,color:'var(--tx2)',marginTop:2}}>JSONファイルとしてダウンロード</div></div>
+      </div>
+      <div className="menu-item" onClick={importData}>
+        <div className="menu-icon" style={{background:'var(--bg2)'}}>📂</div>
+        <div><div style={{fontWeight:600}}>バックアップから復元</div><div style={{fontSize:12,color:'var(--tx2)',marginTop:2}}>JSONファイルを読み込む</div></div>
+      </div>
+      <div className="menu-item" onClick={resetAll}>
+        <div className="menu-icon" style={{background:'#FEF2F2'}}>🗑</div>
+        <div style={{color:'#E03040'}}><div style={{fontWeight:600}}>全データをリセット</div><div style={{fontSize:12,opacity:.7,marginTop:2}}>進捗を全て削除する</div></div>
+      </div>
+      <div style={{padding:'16px 8px 0',fontSize:11,color:'var(--tx3)',textAlign:'center'}}>
+        v1.0 — データは端末に保存されます
+      </div>
+    </div>
+  </>;
+}
+
+/* ═══════════════════════════════════════════════════
+   MOUNT
+   ═══════════════════════════════════════════════════ */
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+
+<script>
+// Register service worker
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js').catch(()=>{});
+}
+</script>
+</body>
+</html>
